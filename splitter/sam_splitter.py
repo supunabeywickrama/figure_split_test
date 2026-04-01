@@ -64,8 +64,22 @@ def split_image_sam(image, min_area=300):
             
         poly_mask = (mask_resized > 0).astype(np.uint8) * 255
         
-        # Verify SAM didn't hallucinate an empty mask
-        valid_points = np.column_stack(np.where(poly_mask > 0))
+        # Fix for Technical Drawings: SAM often only segments the thin black lines,
+        # leaving the inside of the machine hollow/checkered. We must "cover the area".
+        # 1. Lightly expand lines to fuse them together
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+        fused_mask = cv2.dilate(poly_mask, kernel, iterations=1)
+        
+        # 2. Extract ONLY the outermost boundary enclosing the machine
+        contours, _ = cv2.findContours(fused_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 3. Create a SOLID filled geometry (completely white paper background inside the boundary)
+        solid_poly_mask = np.zeros((h, w), dtype=np.uint8)
+        if contours:
+            cv2.drawContours(solid_poly_mask, contours, -1, 255, -1)
+        
+        # Verify mask isn't empty
+        valid_points = np.column_stack(np.where(solid_poly_mask > 0))
         if len(valid_points) == 0: continue
         
         # Neural Transparent RGBA Snippet Extraction
@@ -74,7 +88,7 @@ def split_image_sam(image, min_area=300):
         orig_snippet = image[ymin:ymax, xmin:xmax]
         orig_rgba = cv2.cvtColor(orig_snippet, cv2.COLOR_BGR2BGRA)
         
-        local_mask = poly_mask[ymin:ymax, xmin:xmax]
+        local_mask = solid_poly_mask[ymin:ymax, xmin:xmax]
         mask_idx = local_mask == 255
         
         crop_rgba[mask_idx] = orig_rgba[mask_idx]
@@ -82,9 +96,7 @@ def split_image_sam(image, min_area=300):
         crops.append(crop_rgba)
         final_boxes.append((x, y, box_w, box_h))
         
-        # Draw SAM's neural contour on debug_img 
-        # (This will match the awesome magenta outline you saw on the top machine)
-        contours, _ = cv2.findContours(poly_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Draw the solid organic wrapping boundary
         if contours:
             cv2.drawContours(debug_img, contours, -1, (255, 0, 255), 3)
 
