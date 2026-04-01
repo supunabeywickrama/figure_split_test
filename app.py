@@ -18,10 +18,11 @@ mode = st.sidebar.selectbox("Select Method", ["OpenCV", "SAM"])
 
 if mode == "OpenCV":
     st.sidebar.subheader("OpenCV Configuration")
-    st.sidebar.info("Tip: If separate images are combining into one, reduce Dilation Iterations or Kernel Size.")
-    min_area = st.sidebar.slider("Min Area (pixels)", 500, 50000, 4000, step=500)
+    preprocess_mode = st.sidebar.radio("Preprocessing Mode", ["Threshold Line Art (White Backgrounds)", "Canny Edge (Photos/Complex)"])
+    st.sidebar.info("Tip: Use 'Threshold Line Art' for technical drawings to group separate figures better.")
+    min_area = st.sidebar.slider("Min Area (pixels)", 500, 200000, 4000, step=500)
     dilate_iter = st.sidebar.slider("Dilation Iterations", 0, 10, 2)
-    kernel_size_val = st.sidebar.slider("Kernel Size (odd number)", 3, 21, 7, step=2)
+    kernel_size_val = st.sidebar.slider("Kernel Size (odd number)", 3, 101, 21, step=2)
     kernel_size = (kernel_size_val, kernel_size_val)
 
 uploaded_file = st.file_uploader("Upload Figure Image", type=["png", "jpg", "jpeg"])
@@ -35,7 +36,7 @@ if uploaded_file:
     st.image(image, channels="BGR", caption="Original Image", use_container_width=True)
 
     if mode == "OpenCV":
-        boxes = split_image(image, min_area=min_area, kernel_size=kernel_size, dilate_iter=dilate_iter)
+        boxes = split_image(image, min_area=min_area, kernel_size=kernel_size, dilate_iter=dilate_iter, preprocess_mode=preprocess_mode)
     else:
         st.info("SAM splitting not yet implemented.")
         boxes = []
