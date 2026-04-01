@@ -4,3 +4,6 @@ pillow
 numpy
 openai
 python-dotenv
+scipy
+scikit-learn
+ultralytics
