@@ -60,8 +60,8 @@ if uploaded_file:
         boxes = []
 
     if intermediate_img is not None:
-        st.markdown("### Step 1: Base Contour Generation (Sent to AI)")
-        st.image(intermediate_img, channels="BGR", caption="Intermediate Numbered Boxes")
+        st.markdown("### Step 1: Conceptual LLM Bounding Boxes")
+        st.image(intermediate_img, channels="BGR", caption="GPT-4o Base Spatial Understanding (Orange/Blue boxes)")
 
     if boxes:
         boxes = sorted(boxes, key=lambda b: (b[1], b[0]))

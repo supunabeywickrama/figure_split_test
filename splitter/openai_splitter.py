@@ -27,24 +27,9 @@ def get_base_boxes(image, min_area=100, kernel_size=(5,5), dilate_iter=1):
         x, y, w, h = cv2.boundingRect(c)
         if w * h > min_area:
             boxes.append((x, y, w, h))
-            
-    # Sort boxes top-to-bottom, left-to-right approximately
-    boxes = sorted(boxes, key=lambda b: (b[1] // 50, b[0]))
     return boxes
 
-def draw_numbered_boxes(image, boxes):
-    debug_img = image.copy()
-    for i, (x, y, w, h) in enumerate(boxes):
-        cv2.rectangle(debug_img, (x, y), (x+w, y+h), (0, 0, 255), 2)
-        
-        text = str(i)
-        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-        cv2.rectangle(debug_img, (x, y-th-4), (x+tw+2, y+2), (0,0,0), -1)
-        cv2.putText(debug_img, text, (x+1, y-1), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        
-    return debug_img
-
-def ask_openai_to_group(base64_image):
+def ask_openai_for_bounding_boxes(base64_image):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found in .env file.")
@@ -52,15 +37,19 @@ def ask_openai_to_group(base64_image):
     client = OpenAI(api_key=api_key)
     
     prompt = (
-        "This is an image of a technical drawing with several distinct sub-diagrams. "
-        "I have overlaid red bounding boxes, each labeled with a bright yellow ID number on a black background. "
-        "Your task is to identify the distinct major sub-diagrams and group the IDs of the bounding boxes that belong to each one. "
-        "Rules:\n"
-        "1. Texts, labels, and arrows that point to a specific sub-diagram should be grouped with it.\n"
-        "2. The final output must be ONLY a valid JSON array of arrays of integers representing the grouped IDs.\n"
-        "3. Ensure all relevant IDs are assigned to a group.\n"
-        "4. Do not output any markdown formatting like ```json or any explanations, JUST the correct JSON array string.\n"
-        "Example output: [[0, 1, 2], [3], [4, 5, 6]]"
+        "Act as an expert Computer Vision Layout Analysis Agent. Analyze this technical document.\n"
+        "It contains several distinct sub-diagrams or illustrations showing mechanical machines and details.\n"
+        "Identify the primary visual diagrams. Ignore standalone headers, footers, titles, and pure text paragraphs.\n"
+        "Return a JSON array of objects representing the bounding boxes of only the distinct major diagrams. "
+        "Include any labels or arrows that clearly belong to the diagram.\n"
+        "For each distinct diagram, provide the coordinates normalized between 0 and 1000.\n"
+        "Format strictly as:\n"
+        "[\n"
+        "  {\"ymin\": 100, \"xmin\": 100, \"ymax\": 500, \"xmax\": 500},\n"
+        "  ...\n"
+        "]\n"
+        "IMPORTANT: Do not group two physically separate diagrams (e.g. top and bottom machines) into one box. They MUST be separate bounding boxes.\n"
+        "Return ONLY the valid JSON array string. Nothing else."
     )
     
     try:
@@ -81,57 +70,94 @@ def ask_openai_to_group(base64_image):
                     ]
                 }
             ],
-            max_tokens=300,
+            max_tokens=600,
             temperature=0.0
         )
         content = response.choices[0].message.content.strip()
-        # Sanitizing markdown if it returns it
         if content.startswith("```json"):
             content = content.replace("```json", "", 1)
         if content.endswith("```"):
             content = content[:-3]
         content = content.strip()
             
-        groups = json.loads(content)
-        return groups
+        boxes_json = json.loads(content)
+        return boxes_json
     except Exception as e:
         print(f"OpenAI error/parsing error: {e}")
         return []
 
-def merge_grouped_boxes(boxes, groups):
-    merged_boxes = []
-    for group in groups:
-        if not group: continue
-        group_boxes = [boxes[idx] for idx in group if idx < len(boxes)]
-        if not group_boxes: continue
+def intersect_area(box1, box2):
+    x_left = max(box1[0], box2[0])
+    y_top = max(box1[1], box2[1])
+    x_right = min(box1[2], box2[2])
+    y_bottom = min(box1[3], box2[3])
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+    return (x_right - x_left) * (y_bottom - y_top)
+
+def snap_to_opencv(opencv_boxes, llm_boxes, img_w, img_h):
+    cv_boxes = [[b[0], b[1], b[0]+b[2], b[1]+b[3]] for b in opencv_boxes]
+    final_merged = []
+    
+    for lbox in llm_boxes:
+        ymin = int(lbox.get("ymin", 0) / 1000.0 * img_h)
+        xmin = int(lbox.get("xmin", 0) / 1000.0 * img_w)
+        ymax = int(lbox.get("ymax", 1000) / 1000.0 * img_h)
+        xmax = int(lbox.get("xmax", 1000) / 1000.0 * img_w)
         
-        min_x = min([b[0] for b in group_boxes])
-        min_y = min([b[1] for b in group_boxes])
-        max_x = max([b[0]+b[2] for b in group_boxes])
-        max_y = max([b[1]+b[3] for b in group_boxes])
+        l_rect = [xmin, ymin, xmax, ymax]
+        l_area = (xmax - xmin) * (ymax - ymin)
+        if l_area == 0: continue
         
-        merged_boxes.append((min_x, min_y, max_x - min_x, max_y - min_y))
-    return merged_boxes
+        group_cv_boxes = []
+        for cvb in cv_boxes:
+            cx = (cvb[0] + cvb[2]) / 2
+            cy = (cvb[1] + cvb[3]) / 2
+            
+            i_area = intersect_area(cvb, l_rect)
+            cv_area = (cvb[2]-cvb[0]) * (cvb[3]-cvb[1])
+            
+            if (cv_area > 0 and i_area / cv_area > 0.4) or (xmin - 20 <= cx <= xmax + 20 and ymin - 20 <= cy <= ymax + 20):
+                group_cv_boxes.append(cvb)
+                
+        if group_cv_boxes:
+            min_x = min([b[0] for b in group_cv_boxes])
+            min_y = min([b[1] for b in group_cv_boxes])
+            max_x = max([b[2] for b in group_cv_boxes])
+            max_y = max([b[3] for b in group_cv_boxes])
+            final_merged.append((min_x, min_y, max_x - min_x, max_y - min_y))
+            
+    return final_merged
 
 def split_image_openai(image, min_area=100, kernel_size=(5,5), dilate_iter=1):
-    # 1. Get initial components
-    boxes = get_base_boxes(image, min_area, kernel_size, dilate_iter)
-    if not boxes:
-        return [], None
+    h, w = image.shape[:2]
+    
+    # 1. Ask GPT-4o for conceptual spatial bounding boxes on the raw image
+    b64_image = encode_image(image)
+    llm_boxes = ask_openai_for_bounding_boxes(b64_image)
+    
+    # 2. Get pixel-perfect base boxes from OpenCV
+    cv_boxes = get_base_boxes(image, min_area, kernel_size, dilate_iter)
+    
+    # 3. Snap and Merge
+    if llm_boxes:
+        print(f"OpenAI returned {len(llm_boxes)} bounding boxes.")
+        final_boxes = snap_to_opencv(cv_boxes, llm_boxes, w, h)
         
-    # 2. Draw IDs
-    debug_intermediate = draw_numbered_boxes(image, boxes)
-    
-    # 3. Call OpenAI for semantic grouping
-    b64_image = encode_image(debug_intermediate)
-    groups = ask_openai_to_group(b64_image)
-    
-    # 4. Merge grouped boxes
-    if groups:
-        print(f"OpenAI successfully grouped into {len(groups)} regions.")
-        final_boxes = merge_grouped_boxes(boxes, groups)
+        # Create visual debug image
+        debug_img = image.copy()
+        
+        # Draw LLM "Conceptual" boxes in Light Blue
+        for lbox in llm_boxes:
+            ymin = int(lbox.get("ymin", 0) / 1000.0 * h)
+            xmin = int(lbox.get("xmin", 0) / 1000.0 * w)
+            ymax = int(lbox.get("ymax", 1000) / 1000.0 * h)
+            xmax = int(lbox.get("xmax", 1000) / 1000.0 * w)
+            cv2.rectangle(debug_img, (xmin, ymin), (xmax, ymax), (255, 150, 0), 2)
+            cv2.putText(debug_img, "LLM Core Boundary", (xmin, ymin - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 150, 0), 2)
+            
+        return final_boxes, debug_img
     else:
-        print("OpenAI grouping failed, returning intermediate boxes fallback.")
-        final_boxes = boxes 
-        
-    return final_boxes, debug_intermediate
+        print("OpenAI bounding box prediction failed, returning fallback.")
+        return [], None
