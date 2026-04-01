@@ -2,3 +2,5 @@ streamlit
 opencv-python
 pillow
 numpy
+openai
+python-dotenv
