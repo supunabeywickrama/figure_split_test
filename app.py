@@ -31,9 +31,9 @@ elif mode == "XY-Cut (Whitespace)":
     noise_threshold = st.sidebar.slider("Noise Threshold (pixel sum)", 0, 50, 5)
     dilate_kernel = st.sidebar.slider("Pre-merge Kernel (0 to disable)", 0, 21, 5)
 
-elif mode == "OpenAI Smart Split":
-    st.sidebar.subheader("OpenAI Configuration")
-    st.sidebar.info("Uses GPT-4o to semantically group distinct machine sub-diagrams!")
+elif mode in ["OpenAI Smart Split", "SAM"]:
+    st.sidebar.subheader("AI Configuration")
+    st.sidebar.info("Uses GPT-4o to find Semantic Centers of machines.")
     openai_min_area = st.sidebar.slider("Initial Min Area", 50, 5000, 100, step=50)
 
 uploaded_file = st.file_uploader("Upload Figure Image", type=["png", "jpg", "jpeg"])
@@ -53,36 +53,61 @@ if uploaded_file:
         boxes = split_image_xycut(image, min_area=min_area, min_gap=min_gap, noise_threshold=noise_threshold, dilate_kernel=dilate_kernel)
     elif mode == "OpenAI Smart Split":
         from splitter.openai_splitter import split_image_openai
-        with st.spinner("AI is determining semantic bounding box layouts..."):
-            boxes, intermediate_img = split_image_openai(image, min_area=openai_min_area)
+        with st.spinner("AI is allocating ink to semantic clusters..."):
+            result = split_image_openai(image, min_area=openai_min_area)
+            if len(result) == 3:
+                boxes, intermediate_img, crops = result
+            else:
+                boxes, intermediate_img = result
+                crops = None
+    elif mode == "SAM":
+        from splitter.sam_splitter import split_image_sam
+        with st.spinner("Meta SAM Neural Segmentation running..."):
+            result = split_image_sam(image, min_area=openai_min_area)
+            if len(result) == 3:
+                boxes, intermediate_img, crops = result
+            else:
+                boxes, intermediate_img = result
+                crops = None
     else:
-        st.info("SAM splitting not yet implemented.")
         boxes = []
 
     if intermediate_img is not None:
-        st.markdown("### Step 1: Conceptual LLM Bounding Boxes")
-        st.image(intermediate_img, channels="BGR", caption="GPT-4o Base Spatial Understanding (Orange/Blue boxes)")
+        st.markdown("### Step 1: Semantic Center Extraction by GPT-4o")
+        st.image(intermediate_img, channels="BGR", caption="Green=Machine Centers, Red=Noise Centers")
 
     if boxes:
-        boxes = sorted(boxes, key=lambda b: (b[1], b[0]))
+        if 'crops' in locals() and crops is not None and len(crops) == len(boxes):
+            combined = sorted(zip(boxes, crops), key=lambda b: (b[0][1], b[0][0]))
+            boxes, crops = zip(*combined)
+            boxes = list(boxes)
+            crops = list(crops)
+        else:
+            boxes = sorted(boxes, key=lambda b: (b[1], b[0]))
+            crops = None
         
         debug_img = image.copy()
         for i, (x, y, w, h) in enumerate(boxes):
             cv2.rectangle(debug_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(debug_img, f"Crop {i+1}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        st.subheader("Detected Regions (Final)")
-        st.image(debug_img, channels="BGR", caption="Detected Regions")
+        st.subheader("Detected Regions (Final Boundaries)")
+        st.image(debug_img, channels="BGR", caption="Detected Regions (Extracted Ink Bounds)")
 
-        st.markdown(f"### Cropped Images ({len(boxes)} detected)")
+        st.markdown(f"### Cropped Isolated Images ({len(boxes)} components)")
         
         num_cols = 3
         cols = st.columns(num_cols)
         
         for i, (x, y, w, h) in enumerate(boxes):
-            crop = image[y:y+h, x:x+w]
+            if crops is not None and i < len(crops):
+                crop = crops[i]
+                channels_arg = "BGRA" if len(crop.shape) == 3 and crop.shape[2] == 4 else "BGR"
+            else:
+                crop = image[y:y+h, x:x+w]
+                channels_arg = "BGR"
             with cols[i % num_cols]:
-                st.image(crop, channels="BGR", caption=f"Crop {i+1} ({w}x{h})")
+                st.image(crop, channels=channels_arg, caption=f"Organic Extraction {i+1} ({w}x{h})")
                 
     else:
         st.warning("No regions detected. Try adjusting parameters.")
