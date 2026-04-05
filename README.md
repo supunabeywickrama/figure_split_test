@@ -8,16 +8,16 @@ The robust segmentation process dynamically switches between logical layout unde
 
 ```mermaid
 flowchart TD
-    A[Raw Technical Drawing] --> B{GPT-4o Vision API}
-    B -->|Analyzes Semantic Layout| C[Identifies exact XY Coordinates of Machines]
-    C --> D[K-Means Voronoi Math]
-    D -->|Partitions Floating Ink Lines| E[Generates Strict Bounding Boxes]
-    E --> F{Meta MobileSAM}
-    F -->|Takes Box Prompt| G[Segment Largest Monolithic Shape inside Box]
-    G --> H[Extracts Grainy Line-Art Neural Mask]
-    H --> I[Morphological Solidification]
-    I -->|Trace Outermost Hull & Solid White Fill| J[Creates 100% Solid Silhouette]
-    J --> K([Flawless RGBA Transparent Extraction!])
+    A["Raw Technical Drawing"] --> B{"GPT-4o Vision API"}
+    B -->|Analyzes Semantic Layout| C["Identifies exact XY Coordinates of Machines"]
+    C --> D["K-Means Voronoi Math"]
+    D -->|Partitions Floating Ink Lines| E["Generates Strict Bounding Boxes"]
+    E --> F{"Meta MobileSAM"}
+    F -->|Takes Box Prompt| G["Segment Largest Monolithic Shape inside Box"]
+    G --> H["Extracts Grainy Line-Art Neural Mask"]
+    H --> I["Morphological Solidification"]
+    I -->|Trace Outermost Hull and Solid White Fill| J["Creates 100% Solid Silhouette"]
+    J --> K(["Flawless RGBA Transparent Extraction!"])
     
     style B fill:#10a37f,stroke:#fff,stroke-width:2px,color:#fff
     style D fill:#f39c12,stroke:#fff,stroke-width:2px,color:#fff
