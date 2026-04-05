@@ -6,47 +6,30 @@ This project automates the extraction of individual machine components from comp
 
 The robust segmentation process dynamically switches between logical layout understanding and pixel-perfect neural trace extraction:
 
-```mermaid
-flowchart TD
-    %% Input Section
-    In[Raw Technical Drawing]
+> **Note:** The visual pipeline uses native Markdown instead of Mermaid to avoid browser-level script blocking issues.
 
-    %% Phase 1: Semantic Understanding
-    subgraph Brain [Phase 1: GPT-4o Spatial Reasoning]
-        direction TB
-        B1(Send Image to GPT-4o Vision API)
-        B2[AI Identifies XY Center of Each Machine]
-        B3[Apply K-Means Voronoi Math]
-        B4[Generate Strict Box Bounds around Lines]
-        
-        B1 --> B2 --> B3 --> B4
-    end
+### 🧠 Phase 1: Semantic Understanding (GPT-4o)
+🟢 **Raw Technical Drawing**
+&nbsp;&nbsp;&nbsp;⬇️
+🟦 **Vision Input:** Image is encoded and sent to GPT-4o Vision API
+&nbsp;&nbsp;&nbsp;⬇️
+🟦 **Spatial Reasoning:** AI identifies exact `(X, Y)` centers of each machine
+&nbsp;&nbsp;&nbsp;⬇️
+🟦 **Mathematical Grouping:** K-Means Voronoi algorithm clusters disconnected lines
+&nbsp;&nbsp;&nbsp;⬇️
+🟦 **Box Mapping:** Strict bounding boxes are mathematically generated around clusters
 
-    %% Phase 2: Segmentation
-    subgraph Scalpel [Phase 2: MobileSAM Segmentation]
-        direction TB
-        S1(Feed AI Bounds to Meta MobileSAM)
-        S2[Extract Grainy Neural Mask]
-        S3[Apply Morphological Solidification]
-        S4[Create Solid White Silhouette]
-        
-        S1 --> S2 --> S3 --> S4
-    end
-
-    %% Output Section
-    Out([Flawless RGBA Transparent Sub-Figure])
-
-    %% Main Pipeline Flow
-    In --> Brain
-    B4 --> Scalpel
-    S4 --> Out
-
-    %% Colors and Styling
-    style Brain fill:#0a192f,stroke:#10a37f,stroke-width:2px,color:#fff
-    style Scalpel fill:#0d1117,stroke:#0668E1,stroke-width:2px,color:#fff
-    style In fill:#2c3e50,stroke:#fff,stroke-width:2px,color:#fff
-    style Out fill:#e74c3c,stroke:#fff,stroke-width:2px,color:#fff
-```
+### 🔪 Phase 2: Segmentation (MobileSAM)
+&nbsp;&nbsp;&nbsp;⬇️
+🟧 **Neural Scalpel:** Bounding boxes are fed as prompts to Meta's MobileSAM
+&nbsp;&nbsp;&nbsp;⬇️
+🟧 **Mask Extraction:** SAM shrink-wraps the fragments into a neural line-art mask
+&nbsp;&nbsp;&nbsp;⬇️
+🟧 **Solidification:** Morphological logic solidifies the porous, grainy masks
+&nbsp;&nbsp;&nbsp;⬇️
+🟧 **Clean Silhouette:** A 100% solid, white-filled trace is created
+&nbsp;&nbsp;&nbsp;⬇️
+🏁 **Flawless RGBA Transparent Sub-Figure Extracted!**
 
 ### Step 1: Brain (GPT-4o Semantic Spatial Reasoning)
 - The raw schematic image is encoded and sent to **GPT-4o**. 
