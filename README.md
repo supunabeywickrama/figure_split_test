@@ -8,22 +8,44 @@ The robust segmentation process dynamically switches between logical layout unde
 
 ```mermaid
 flowchart TD
-    A[Raw Technical Drawing] --> B(GPT-4o Vision API)
-    B -->|Analyzes Semantic Layout| C[Identifies exact XY Coordinates of Machines]
-    C --> D[K-Means Voronoi Math]
-    D -->|Partitions Floating Ink Lines| E[Generates Strict Bounding Boxes]
-    E --> F(Meta MobileSAM)
-    F -->|Takes Box Prompt| G[Segment Largest Monolithic Shape inside Box]
-    G --> H[Extracts Grainy Line-Art Neural Mask]
-    H --> I[Morphological Solidification]
-    I -->|Trace Outermost Hull and Solid White Fill| J[Creates Solid Silhouette]
-    J --> K([Flawless RGBA Transparent Extraction])
-    
-    style B fill:#10a37f,stroke:#fff,stroke-width:2px,color:#fff
-    style D fill:#f39c12,stroke:#fff,stroke-width:2px,color:#fff
-    style F fill:#0668E1,stroke:#fff,stroke-width:2px,color:#fff
-    style I fill:#8e44ad,stroke:#fff,stroke-width:2px,color:#fff
-    style K fill:#e74c3c,stroke:#fff,stroke-width:2px,color:#fff
+    %% Input Section
+    In[Raw Technical Drawing]
+
+    %% Phase 1: Semantic Understanding
+    subgraph Brain [Phase 1: GPT-4o Spatial Reasoning]
+        direction TB
+        B1(Send Image to GPT-4o Vision API)
+        B2[AI Identifies XY Center of Each Machine]
+        B3[Apply K-Means Voronoi Math]
+        B4[Generate Strict Box Bounds around Lines]
+        
+        B1 --> B2 --> B3 --> B4
+    end
+
+    %% Phase 2: Segmentation
+    subgraph Scalpel [Phase 2: MobileSAM Segmentation]
+        direction TB
+        S1(Feed AI Bounds to Meta MobileSAM)
+        S2[Extract Grainy Neural Mask]
+        S3[Apply Morphological Solidification]
+        S4[Create Solid White Silhouette]
+        
+        S1 --> S2 --> S3 --> S4
+    end
+
+    %% Output Section
+    Out([Flawless RGBA Transparent Sub-Figure])
+
+    %% Main Pipeline Flow
+    In --> Brain
+    B4 --> Scalpel
+    S4 --> Out
+
+    %% Colors and Styling
+    style Brain fill:#0a192f,stroke:#10a37f,stroke-width:2px,color:#fff
+    style Scalpel fill:#0d1117,stroke:#0668E1,stroke-width:2px,color:#fff
+    style In fill:#2c3e50,stroke:#fff,stroke-width:2px,color:#fff
+    style Out fill:#e74c3c,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
 ### Step 1: Brain (GPT-4o Semantic Spatial Reasoning)
