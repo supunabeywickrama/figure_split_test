@@ -6,30 +6,25 @@ This project automates the extraction of individual machine components from comp
 
 The robust segmentation process dynamically switches between logical layout understanding and pixel-perfect neural trace extraction:
 
-> **Note:** The visual pipeline uses native Markdown instead of Mermaid to avoid browser-level script blocking issues.
-
-### 🧠 Phase 1: Semantic Understanding (GPT-4o)
-🟢 **Raw Technical Drawing**
-&nbsp;&nbsp;&nbsp;⬇️
-🟦 **Vision Input:** Image is encoded and sent to GPT-4o Vision API
-&nbsp;&nbsp;&nbsp;⬇️
-🟦 **Spatial Reasoning:** AI identifies exact `(X, Y)` centers of each machine
-&nbsp;&nbsp;&nbsp;⬇️
-🟦 **Mathematical Grouping:** K-Means Voronoi algorithm clusters disconnected lines
-&nbsp;&nbsp;&nbsp;⬇️
-🟦 **Box Mapping:** Strict bounding boxes are mathematically generated around clusters
-
-### 🔪 Phase 2: Segmentation (MobileSAM)
-&nbsp;&nbsp;&nbsp;⬇️
-🟧 **Neural Scalpel:** Bounding boxes are fed as prompts to Meta's MobileSAM
-&nbsp;&nbsp;&nbsp;⬇️
-🟧 **Mask Extraction:** SAM shrink-wraps the fragments into a neural line-art mask
-&nbsp;&nbsp;&nbsp;⬇️
-🟧 **Solidification:** Morphological logic solidifies the porous, grainy masks
-&nbsp;&nbsp;&nbsp;⬇️
-🟧 **Clean Silhouette:** A 100% solid, white-filled trace is created
-&nbsp;&nbsp;&nbsp;⬇️
-🏁 **Flawless RGBA Transparent Sub-Figure Extracted!**
+```mermaid
+flowchart TD
+    A[Raw Technical Drawing] --> B{GPT-4o Vision API}
+    B -->|Analyzes Semantic Layout| C[Identifies exact XY Coordinates of Machines]
+    C --> D[K-Means Voronoi Math]
+    D -->|Partitions Floating Ink Lines| E[Generates Strict Bounding Boxes]
+    E --> F{Meta MobileSAM}
+    F -->|Takes Box Prompt| G[Segment Largest Monolithic Shape inside Box]
+    G --> H[Extracts Grainy Line-Art Neural Mask]
+    H --> I[Morphological Solidification]
+    I -->|Trace Outermost Hull & Solid White Fill| J[Creates 100% Solid Silhouette]
+    J --> K([Flawless RGBA Transparent Extraction!])
+    
+    style B fill:#10a37f,stroke:#fff,stroke-width:2px,color:#fff
+    style D fill:#f39c12,stroke:#fff,stroke-width:2px,color:#fff
+    style F fill:#0668E1,stroke:#fff,stroke-width:2px,color:#fff
+    style I fill:#8e44ad,stroke:#fff,stroke-width:2px,color:#fff
+    style K fill:#e74c3c,stroke:#fff,stroke-width:2px,color:#fff
+```
 
 ### Step 1: Brain (GPT-4o Semantic Spatial Reasoning)
 - The raw schematic image is encoded and sent to **GPT-4o**. 
